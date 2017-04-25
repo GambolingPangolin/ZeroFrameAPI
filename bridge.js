@@ -170,3 +170,20 @@ app.ports.siteSign_.subscribe(function(params) {
 		app.ports.onSiteSign_.send(res);
 	});
 });
+
+// mergerSiteAdd
+app.ports.mergerSiteAdd.subscribe(function(addresses) {
+	ZF.cmd("mergerSiteAdd",addresses);
+});
+
+// mergerSiteDelete
+app.ports.mergerSiteDelete.subscribe(function(a) {
+	ZF.cmd("mergerSiteDelete",a)
+});
+
+// mergerSiteList
+app.ports.mergerSiteList.subscribe(function(q) {
+	ZF.cmd("mergerSiteList",q,function(res) {
+		app.ports.onMergerSiteList_.send(res);
+	});
+});

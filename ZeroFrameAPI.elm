@@ -42,7 +42,27 @@ port module ZeroFrameAPI exposing (
     , onSitePublish
     , siteSign
     , onSiteSign
+    , mergerSiteAdd
+    , mergerSiteDelete
+    , mergerSiteList
+    , onMergerSiteList
     )
+
+{-| This library makes (eventually) all of the ZeroFrame API calls available to Elm so that Elm can be used to develop apps for ZeroNet. 
+
+# Messages
+@docs ZeroFrameMsg
+
+# Wrapper calls
+@docs wrapperConfirm, onWrapperConfirm, wrapperInnerLoaded, wrapperGetLocalStorage, onGetLocalStorage, wrapperSetLocalStorage, wrapperGetState, onGetState, wrapperNotification, wrapperOpenWindow, wrapperPermissionAdd, wrapperPrompt, onPrompt, wrapperPushState, wrapperSetTitle, wrapperSetViewport
+
+# UI server calls
+@docs certAdd, onCertAdd, certSelect, channelJoin, dbQuery, onQueryResult, fileDelete, onFileDelete, fileGet, onFileGet, fileList, onFileList, fileQuery, onFileQuery, fileRules, onFileRules, fileWrite, onFileWrite, serverInfo, onServerInfo, siteInfo, onSiteInfo, sitePublish, onSitePublish, siteSign, onSiteSign
+
+# Merger plugin
+@docs mergerSiteAdd, mergerSiteDelete, mergerSiteList, onMergerSiteList
+
+-}
 
 import Json.Encode exposing (Value)
 import Json.Encode as E
@@ -54,6 +74,8 @@ import List exposing (concat,map)
 import Result as R
 
 type alias ErrMsg = String
+
+{-| ZeroFrameMsg describes the possible messages that ZeroFrame might send -}
 
 type ZeroFrameMsg =
     WrapperConfirmClick Bool
@@ -72,13 +94,18 @@ type ZeroFrameMsg =
     | SiteInfo (Result String Value)
     | SitePublish (Maybe ErrMsg)
     | SiteSign (Maybe ErrMsg)
+    | MergerSiteList Value
 
 -- Wrapper calls
 
--- wrapperConfirm message button_caption
 port wrapperConfirm_ : Value -> Cmd msg
 port onWrapperConfirm_ : (Bool -> msg) -> Sub msg
 
+{-| Use wrapperConfirm to post a confirmation message to the user.
+
+    wrapperConfirm "Go for it?" (Just "Go!")
+
+-}
 wrapperConfirm : String -> Maybe String -> Cmd msg
 wrapperConfirm message caption =
     let
@@ -89,30 +116,52 @@ wrapperConfirm message caption =
     in
        wrapperConfirm_ v
 
+{-| Use onWrapperConfirm to listen for confirmation messages 
+
+-}
 onWrapperConfirm : Sub ZeroFrameMsg
 onWrapperConfirm = onWrapperConfirm_ WrapperConfirmClick
 
--- Applies window.location.hash to page url.  Call when the page is fully 
--- loaded to jump to the desired anchor point
+{-| Applies window.location.hash to page url.  Call when the page is fully loaded to jump to the desired anchor point.
+
+-}
+
 port wrapperInnerLoaded : () -> Cmd msg 
 
--- Return the browser's local store for the site
+{-| Request the contents of the browser's local storage for the site.
+
+-}
+
 port wrapperGetLocalStorage : () -> Cmd msg
 port onGetLocalStorage_ : (Value -> msg) -> Sub msg
+
+{-| Listen for the browser's local storage for the site.
+
+-}
 
 onGetLocalStorage : Sub ZeroFrameMsg
 onGetLocalStorage = onGetLocalStorage_ LocalStorage
 
--- Get the browser's current history state object
+{-| Request the browser's current history state object.
+
+-}
+
 port wrapperGetState : () -> Cmd msg
 port onGetState_ : (Value -> msg) -> Sub msg
 
+{-| Subscription for the browser's current history state.
+
+-}
 onGetState : Sub ZeroFrameMsg
 onGetState = onGetState_ HistoryState
 
--- Display a notification
--- wrapperNotification (info|error|done) message [timeout]
 port wrapperNotification_ : Value -> Cmd msg
+
+{-| Display a notification.
+
+Usage: wrapperNotification ("info"|"error"|"done") message [timeout]
+
+-}
 
 wrapperNotification : String -> String -> Maybe Int -> Cmd msg
 wrapperNotification t message to =
@@ -124,9 +173,13 @@ wrapperNotification t message to =
     in
        wrapperNotification_ v
 
--- Navigates or opens a new popup
--- wrapperOpenWindow _url [target] [specs]
 port wrapperOpenWindow_ : Value -> Cmd msg
+
+{-| Navigates or opens a new popup.
+
+Usage: wrapperOpenWindow url [target] [specs]
+
+-}
 
 wrapperOpenWindow : String -> Maybe String -> Maybe String -> Cmd msg
 wrapperOpenWindow u t s =
@@ -139,12 +192,21 @@ wrapperOpenWindow u t s =
     in
        wrapperOpenWindow_ v
 
--- Request a permission
+{-| Request a permission.
+
+-}
 port wrapperPermissionAdd : String -> Cmd msg
 
--- Prompt for text input
 port wrapperPrompt_ : Value -> Cmd msg
 port onPrompt_ : (String -> msg) -> Sub msg
+
+{-| Prompt for input.
+
+Usage: wrapperPrompt promptMessage ("text"|"password"|etc.)
+
+The default type is "text".
+
+-}
 
 wrapperPrompt : String -> Maybe String -> Cmd msg
 wrapperPrompt m t =
@@ -156,12 +218,19 @@ wrapperPrompt m t =
     in
        wrapperPrompt_ v
 
+{-| Subscribe to the user input from prompts.
+
+-}
 onPrompt : Sub ZeroFrameMsg
 onPrompt = onPrompt_ PromptInput
 
--- Change the url and add new entry to browser's history
--- wrapperPushState stateJSON title url
 port wrapperPushState_ : Value -> Cmd msg
+
+{-| Change the url and add a new entry to the browser's history.
+
+Usage: wrapperPushState stateJSON title url
+
+-}
 
 wrapperPushState : Value -> String -> String -> Cmd msg
 wrapperPushState st ti ur =
@@ -171,25 +240,40 @@ wrapperPushState st ti ur =
        wrapperPushState_ v
 
 
--- Change the url without adding a history entry
--- wrapperReplaceState stateJSON title url
 port wrapperReplaceState_ : Value -> Cmd msg
 
-wrapperReplateState st ti ur =
+{-| Change the url without modifying the browser's history.
+
+Usage: wrapperReplaceState stateJSON title url
+
+-}
+
+wrapperReplaceState : Value -> String -> String -> Cmd msg
+wrapperReplaceState st ti ur =
     let
         v = E.list [st, E.string ti, E.string ur] 
     in
        wrapperReplaceState_ v
 
 
--- Set the browser's local data store for this site
--- wrapperSetLocalStorage stringJSON
+{-| Set the browser's local data store for this site
+
+Usage: wrapperSetLocalStorage JSONdata
+
+-}
+
 port wrapperSetLocalStorage : Value -> Cmd msg
 
--- Set the title
+{-| Set the title.
+
+-}
+
 port wrapperSetTitle : String -> Cmd msg
 
--- Set the viewport meta tag content
+{-| Set the viewport meta tag content.
+
+-}
+
 port wrapperSetViewport : String -> Cmd msg
 
 
@@ -201,12 +285,23 @@ port wrapperSetViewport : String -> Cmd msg
 port certAdd_ : Value -> Cmd msg
 port onCertAdd_ : (Value -> msg) -> Sub msg
 
+{-| Add a new certificate for the user.
+
+Usage: certAdd domain authType authUserName cert
+where cert is a signature for authAddress#authType/authUserName using the domain public key.
+
+-}
+
 certAdd : String -> String -> String -> String -> Cmd msg
 certAdd d at aun c =
     let
         v = map E.string [d,at,aun,c] |> E.list
     in
        certAdd_ v
+
+{-| Subscribe to responses to certAdd.
+
+-}
 
 onCertAdd : Sub ZeroFrameMsg
 onCertAdd = onCertAdd_ (
@@ -215,18 +310,27 @@ onCertAdd = onCertAdd_ (
     CertAdd
     )
 
--- Display certificate selector
--- uiCertSelect accepted_domains
+{-| Display certificate selector, passing a list of accepted domains.
+
+-}
+
 port certSelect : List String -> Cmd msg
 
--- Request notifications about site's events
--- uiChannelJoin channel
+{-| Request notifications about site's events. 
+
+-}
+
 port channelJoin : String -> Cmd msg
 
--- Query the database
--- dbQuery sqlQuery
+{-| Query the database by passing an SQL query.
+
+-}
 port dbQuery : String -> Cmd msg
 port onQueryResult_ : (Value -> msg) -> Sub msg
+
+{-| Subscribe to query results.
+
+-}
 
 onQueryResult : Sub ZeroFrameMsg
 onQueryResult = onQueryResult_ (
@@ -234,19 +338,26 @@ onQueryResult = onQueryResult_ (
            R.andThen (decodeValue (D.list D.value)) >> 
            QueryResult
            )
+{-| Delete a file, passing the inner path to the file.
 
--- Delete a file
--- fileDelete inner_path
+-}
 port fileDelete : String -> Cmd msg
 port onFileDelete_ : (Value -> msg) -> Sub msg
 
+{-| Subscribe to responses to fileDelete calls.
+
+-}
 onFileDelete : Sub ZeroFrameMsg
 onFileDelete = onFileDelete_ (possibleErr >> FileDelete)
 
--- Get contents of a file
--- fileGet inner_path [required] [base64|text] [timeout]
 port fileGet_ : Value -> Cmd msg
 port onFileGet_ : (Value -> msg) -> Sub msg
+
+{-| Get contents of a file.
+
+Usage: fileGet innerPath [required] ["base64"|"text"] [timeout]
+
+-}
 
 fileGet : String -> Maybe Bool -> Maybe String -> Maybe Int -> Cmd msg
 fileGet ip r fmt to =
@@ -260,64 +371,122 @@ fileGet ip r fmt to =
     in
        fileGet_ v
 
+{-| Subscribe to responses to fileGet calls.
+
+-}
+onFileGet : Sub ZeroFrameMsg
 onFileGet = onFileGet_ (
     handleResult >> 
     R.andThen (decodeValue D.string) 
     >> FileContents
     )
 
--- List files in a directory
--- fileList inner_path
+{-| List files in a directory (recursively), passing the inner path.
+
+-}
+
 port fileList : String -> Cmd msg
 port onFileList_ : (Value -> msg) -> Sub msg
 
-onFileList = onFileList_
+{-| Subscribe to responses to fileList calls.
+
+-}
+onFileList : Sub ZeroFrameMsg
+onFileList = onFileList_ (handleResult >> FileList)
 
 -- Simple JSON file query command
 -- fileQuery dir_inner_path query
 port fileQuery_ : Value -> Cmd msg
 port onFileQuery_ : (Value -> msg) -> Sub msg
 
+{-| Simple JSON file query command.
+
+Examples:
+
+* `fileQuery "data/users/*/data.json" "topics"` returns a list containing the topics node from each matched file.
+* `fileQuery "data/users/*/data.json" "comments.1@2"` returns `data["comments"]["1@2"]` from each matched file.
+* `fileQuery "data/users/*/data.json" ""` returns all content for each matched file. 
+
+-}
+
 fileQuery : String -> String -> Cmd msg
 fileQuery dip q = fileQuery_ (E.list [E.string dip, E.string q])
+
+{-| Subscribe to responses of fileQuery calls.
+
+-}
 
 onFileQuery : Sub ZeroFrameMsg
 onFileQuery = onFileQuery_ (handleResult >> FileQuery)
 
--- Get the rules for a file
--- fileRules inner_path
+{-| Get the rules for a file, passing the inner path.
+
+-}
+
 port fileRules : String -> Cmd msg
 port onFileRules_ : (Value -> msg) -> Sub msg
 
+{-| Subscribe to responses to fileRules calls.
+
+-}
+
+onFileRules : Sub ZeroFrameMsg
 onFileRules = onFileRules_ (handleResult >> FileRules)
 
 port fileWrite_ : Value -> Cmd msg
 port onFileWrite_ : (Value -> msg) -> Sub msg
 
--- Write to a file
--- fileWrite inner_path content_base64
+{-| Write to a file.
+
+Usage: `fileWrite innerPath contentBase64`
+
+-}
+
 fileWrite : String -> String -> Cmd msg
 fileWrite ip cb64 = fileWrite_ (E.list [E.string ip, E.string cb64])
+
+{-| Subscribe to responses to fileWrite messages.
+
+-}
 
 onFileWrite : Sub ZeroFrameMsg
 onFileWrite = onFileWrite_ (possibleErr >> FileWrite)
 
--- Get server information
+{-| Request server information.
+
+-}
+
 port serverInfo : () -> Cmd msg
 port onServerInfo_ : (Value -> msg) -> Sub msg
 
-onServerInfo = onServerInfo_
+{-| Subscribe to responses to serverInfo calls.
 
--- Get site information
+-}
+onServerInfo : Sub ZeroFrameMsg
+onServerInfo = onServerInfo_ (handleResult >> ServerInfo)
+
+{-| Request site information.
+
+-}
+
 port siteInfo : () -> Cmd msg
 port onSiteInfo_ : (Value -> msg) -> Sub msg
 
-onSiteInfo = onSiteInfo_
+{-| Subscribe to responses to siteInfo calls.
 
--- Publish site
--- sitePublish [privateKey] [inner_path] [sign]
+-}
+
+onSiteInfo : Sub ZeroFrameMsg
+onSiteInfo = onSiteInfo_ (handleResult >> SiteInfo)
+
 port sitePublish_ : Value -> Cmd msg
 port onSitePublish_ : (Value -> msg) -> Sub msg
+
+{-| Publish site.
+
+Usage: `sitePublish [privateKey] [innerPath] [sign]` 
+
+-}
 
 sitePublish : Maybe String -> Maybe String -> Maybe Bool -> Cmd msg
 sitePublish pk ip s =
@@ -330,13 +499,21 @@ sitePublish pk ip s =
     in
        sitePublish_ v
 
+{-| Subscribe to responses to sitePublish calls.
+
+-}
+
 onSitePublish : Sub ZeroFrameMsg
 onSitePublish = onSitePublish_ (possibleErr >> SitePublish)
 
--- Sign site
--- siteSign [privateKey] [inner_path]
 port siteSign_ : Value -> Cmd msg
 port onSiteSign_ : (Value -> msg) -> Sub msg
+
+{-| Sign a content.json file.
+
+Usage: `siteSign [privateKey] [innerPath]`
+
+-}
 
 siteSign : Maybe String -> Maybe String -> Cmd msg
 siteSign pk ip =
@@ -348,8 +525,43 @@ siteSign pk ip =
     in
        siteSign_ v
 
+{-| Subscribe to responses to siteSign calls.
+
+-}
+
 onSiteSign : Sub ZeroFrameMsg
 onSiteSign = onSiteSign_ (possibleErr >> SiteSign)
+
+-- MERGER plugin
+
+{-| Start downloading new merger sites.
+
+Usage: `mergerSiteAdd ["A", "B"]
+
+-}
+port mergerSiteAdd : List String -> Cmd msg
+
+{-| Stop seeding and delete a merged site.
+
+Usage: `mergerSiteDelete siteAddress`
+
+-}
+port mergerSiteDelete : String -> Cmd msg
+
+{-| Request merged sites.
+
+Usage: `mergerSiteList getDetails`
+
+-}
+port mergerSiteList : Bool -> Cmd msg
+port onMergerSiteList_ : (Value -> msg) -> Sub msg
+
+{-| Subscription for responses to mergerSiteList.
+
+-}
+
+onMergerSiteList : Sub ZeroFrameMsg
+onMergerSiteList = onMergerSiteList_ MergerSiteList
 
 -- HELPER functions
 
