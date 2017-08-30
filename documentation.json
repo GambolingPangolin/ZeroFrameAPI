@@ -1,0 +1,250 @@
+[
+  {
+    "name": "ZeroFrameAPI",
+    "comment": " This library makes (eventually) all of the ZeroFrame API calls available to Elm so that Elm can be used to develop apps for ZeroNet. \n\n# Messages\n@docs ZeroFrameMsg\n\n# Wrapper calls\n@docs wrapperConfirm, onWrapperConfirm, wrapperInnerLoaded, wrapperGetLocalStorage, onGetLocalStorage, wrapperSetLocalStorage, wrapperGetState, onGetState, wrapperNotification, wrapperOpenWindow, wrapperPermissionAdd, wrapperPrompt, onPrompt, wrapperPushState, wrapperSetTitle, wrapperSetViewport\n\n# UI server calls\n@docs certAdd, onCertAdd, certSelect, channelJoin, dbQuery, onQueryResult, fileDelete, onFileDelete, fileGet, onFileGet, fileList, onFileList, fileQuery, onFileQuery, fileRules, onFileRules, fileWrite, onFileWrite, serverInfo, onServerInfo, siteInfo, onSiteInfo, sitePublish, onSitePublish, siteSign, onSiteSign\n\n",
+    "aliases": [],
+    "types": [
+      {
+        "name": "ZeroFrameMsg",
+        "comment": " ZeroFrameMsg describes the possible messages that ZeroFrame might send ",
+        "args": [],
+        "cases": [
+          [
+            "WrapperConfirmClick",
+            [
+              "Bool"
+            ]
+          ],
+          [
+            "LocalStorage",
+            [
+              "Json.Encode.Value"
+            ]
+          ],
+          [
+            "HistoryState",
+            [
+              "Json.Encode.Value"
+            ]
+          ],
+          [
+            "PromptInput",
+            [
+              "String"
+            ]
+          ],
+          [
+            "CertAdd",
+            [
+              "Result.Result String String"
+            ]
+          ],
+          [
+            "QueryResult",
+            [
+              "Result.Result String (List Json.Encode.Value)"
+            ]
+          ],
+          [
+            "FileDelete",
+            [
+              "Maybe.Maybe ZeroFrameAPI.ErrMsg"
+            ]
+          ],
+          [
+            "FileContents",
+            [
+              "Result.Result String String"
+            ]
+          ],
+          [
+            "FileList",
+            [
+              "Result.Result String Json.Encode.Value"
+            ]
+          ],
+          [
+            "FileQuery",
+            [
+              "Result.Result String Json.Encode.Value"
+            ]
+          ],
+          [
+            "FileRules",
+            [
+              "Result.Result String Json.Encode.Value"
+            ]
+          ],
+          [
+            "FileWrite",
+            [
+              "Maybe.Maybe ZeroFrameAPI.ErrMsg"
+            ]
+          ],
+          [
+            "ServerInfo",
+            [
+              "Result.Result String Json.Encode.Value"
+            ]
+          ],
+          [
+            "SiteInfo",
+            [
+              "Result.Result String Json.Encode.Value"
+            ]
+          ],
+          [
+            "SitePublish",
+            [
+              "Maybe.Maybe ZeroFrameAPI.ErrMsg"
+            ]
+          ],
+          [
+            "SiteSign",
+            [
+              "Maybe.Maybe ZeroFrameAPI.ErrMsg"
+            ]
+          ]
+        ]
+      }
+    ],
+    "values": [
+      {
+        "name": "certAdd",
+        "comment": " Add a new certificate for the user.\n\nUsage: certAdd domain authType authUserName cert\nwhere cert is a signature for authAddress#authType/authUserName using the domain public key.\n\n",
+        "type": "String -> String -> String -> String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "fileGet",
+        "comment": " Get contents of a file.\n\nUsage: fileGet innerPath [required] [\"base64\"|\"text\"] [timeout]\n\n",
+        "type": "String -> Maybe.Maybe Bool -> Maybe.Maybe String -> Maybe.Maybe Int -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "fileQuery",
+        "comment": " Simple JSON file query command.\n\nExamples:\n\n* `fileQuery \"data/users/*/data.json\" \"topics\"` returns a list containing the topics node from each matched file.\n* `fileQuery \"data/users/*/data.json\" \"comments.1@2\"` returns `data[\"comments\"][\"1@2\"]` from each matched file.\n* `fileQuery \"data/users/*/data.json\" \"\"` returns all content for each matched file. \n\n",
+        "type": "String -> String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "fileWrite",
+        "comment": " Write to a file.\n\nUsage: `fileWrite innerPath contentBase64`\n\n",
+        "type": "String -> String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "onCertAdd",
+        "comment": " Subscribe to responses to certAdd.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onFileDelete",
+        "comment": " Subscribe to responses to fileDelete calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onFileGet",
+        "comment": " Subscribe to responses to fileGet calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onFileList",
+        "comment": " Subscribe to responses to fileList calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onFileQuery",
+        "comment": " Subscribe to responses of fileQuery calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onFileRules",
+        "comment": " Subscribe to responses to fileRules calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onFileWrite",
+        "comment": " Subscribe to responses to fileWrite messages.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onGetLocalStorage",
+        "comment": " Listen for the browser's local storage for the site.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onGetState",
+        "comment": " Subscription for the browser's current history state.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onPrompt",
+        "comment": " Subscribe to the user input from prompts.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onQueryResult",
+        "comment": " Subscribe to query results.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onServerInfo",
+        "comment": " Subscribe to responses to serverInfo calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onSiteInfo",
+        "comment": " Subscribe to responses to siteInfo calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onSitePublish",
+        "comment": " Subscribe to responses to sitePublish calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onSiteSign",
+        "comment": " Subscribe to responses to siteSign calls.\n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "onWrapperConfirm",
+        "comment": " Use onWrapperConfirm to listen for confirmation messages \n\n",
+        "type": "Platform.Sub.Sub ZeroFrameAPI.ZeroFrameMsg"
+      },
+      {
+        "name": "sitePublish",
+        "comment": " Publish site.\n\nUsage: `sitePublish [privateKey] [innerPath] [sign]` \n\n",
+        "type": "Maybe.Maybe String -> Maybe.Maybe String -> Maybe.Maybe Bool -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "siteSign",
+        "comment": " Sign a content.json file.\n\nUsage: `siteSign [privateKey] [innerPath]`\n\n",
+        "type": "Maybe.Maybe String -> Maybe.Maybe String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "wrapperConfirm",
+        "comment": " Use wrapperConfirm to post a confirmation message to the user.\n\n    wrapperConfirm \"Go for it?\" (Just \"Go!\")\n\n",
+        "type": "String -> Maybe.Maybe String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "wrapperNotification",
+        "comment": " Display a notification.\n\nUsage: wrapperNotification (\"info\"|\"error\"|\"done\") message [timeout]\n\n",
+        "type": "String -> String -> Maybe.Maybe Int -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "wrapperOpenWindow",
+        "comment": " Navigates or opens a new popup.\n\nUsage: wrapperOpenWindow url [target] [specs]\n\n",
+        "type": "String -> Maybe.Maybe String -> Maybe.Maybe String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "wrapperPrompt",
+        "comment": " Prompt for input.\n\nUsage: wrapperPrompt promptMessage (\"text\"|\"password\"|etc.)\n\nThe default type is \"text\".\n\n",
+        "type": "String -> Maybe.Maybe String -> Platform.Cmd.Cmd msg"
+      },
+      {
+        "name": "wrapperPushState",
+        "comment": " Change the url and add a new entry to the browser's history.\n\nUsage: wrapperPushState stateJSON title url\n\n",
+        "type": "Json.Encode.Value -> String -> String -> Platform.Cmd.Cmd msg"
+      }
+    ],
+    "generated-with-elm-version": "0.18.0"
+  }
+]
