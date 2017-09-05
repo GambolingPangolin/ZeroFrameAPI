@@ -155,8 +155,8 @@ responseMessage t res (Z i c d m) =
 
     init = liftInit innerInit
 -}
-liftInit : model -> Z msg model
-liftInit = wrap
+liftInit : (model, Cmd msg) -> (Z msg model, Cmd (M msg))
+liftInit (model, c) = (wrap model, C.map Forward c)
 
 {-| Lift a domain subscription function to a ZeroNet-Elm subscription.
 
