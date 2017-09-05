@@ -33,13 +33,13 @@ port module ZeroFrame.API exposing (
 {-| This library makes (eventually) all of the ZeroFrame API calls available to Elm so that Elm can be used to develop apps for ZeroNet. 
 
 # Wrapper calls
-@docs wrapperConfirm, onWrapperConfirm, wrapperInnerLoaded, wrapperGetLocalStorage, onGetLocalStorage, wrapperSetLocalStorage, wrapperGetState, onGetState, wrapperNotification, wrapperOpenWindow, wrapperPermissionAdd, wrapperPrompt, onPrompt, wrapperPushState, wrapperSetTitle, wrapperSetViewport
+@docs wrapperConfirm, wrapperInnerLoaded, wrapperGetLocalStorage, wrapperSetLocalStorage, wrapperGetState, wrapperNotification, wrapperOpenWindow, wrapperPermissionAdd, wrapperPrompt, wrapperPushState, wrapperSetTitle, wrapperSetViewport
 
 # UI server calls
-@docs certAdd, onCertAdd, certSelect, channelJoin, dbQuery, onQueryResult, fileDelete, onFileDelete, fileGet, onFileGet, fileList, onFileList, fileQuery, onFileQuery, fileRules, onFileRules, fileWrite, onFileWrite, serverInfo, onServerInfo, siteInfo, onSiteInfo, sitePublish, onSitePublish, siteSign, onSiteSign
+@docs certAdd, certSelect, channelJoin, dbQuery, fileDelete, fileGet, fileList, fileQuery, fileRules, fileWrite, serverInfo, siteInfo, sitePublish, siteSign 
 
 # Merger plugin
-@docs mergerSiteAdd, mergerSiteDelete, mergerSiteList, onMergerSiteList
+@docs mergerSiteAdd, mergerSiteDelete, mergerSiteList
 
 -}
 
@@ -53,6 +53,8 @@ import List exposing (concat,map)
 import Result as R
 
 import Maybe as M
+
+import ZeroFrame.Core exposing (Z, command, commandThen)
 
 -- Wrapper calls
 
@@ -151,8 +153,8 @@ wrapperPrompt m t h =
             [E.string m]
             , optional E.string t
             ] |> E.list
-        h' = decodeValue E.string >> R.toMaybe >> M.map h 
-    in commandThen "wrapperPrompt" v h' 
+        h2 = decodeValue D.string >> R.toMaybe >> M.map h 
+    in commandThen "wrapperPrompt" v h2 
 
 {-| Change the url and add a new entry to the browser's history.
 
@@ -202,7 +204,7 @@ wrapperSetTitle title = command "wrapperSetTitle" (E.string title)
 -}
 
 wrapperSetViewport : String -> Z msg ()
-wrapperSetViewport s = command "wrapperSetViewport" (E.string title)
+wrapperSetViewport s = command "wrapperSetViewport" (E.string s)
 
 
 -- UI server calls
@@ -218,7 +220,7 @@ certAdd : String -> String -> String -> String -> (Result String Value -> msg) -
 certAdd d at aun c h =
     let
         v = map E.string [d,at,aun,c] |> E.list
-    in commandThen "certAdd" v (handleResult >> h)
+    in commandThen "certAdd" v (withResult h)
 
 {-| Display certificate selector, passing a list of accepted domains.
 
@@ -226,7 +228,7 @@ certAdd d at aun c h =
 
 certSelect : List String -> Z msg ()
 certSelect cs = 
-  command "certSelect" (E.list <| L.map E.string cs)
+  command "certSelect" (E.list <| map E.string cs)
 
 
 {-| Request notifications about site's events. 
@@ -243,13 +245,13 @@ channelJoin c =
 dbQuery : String -> (Result String (List Value) -> msg) -> Z msg ()
 dbQuery q h = 
   let
-      h' = handleResult >> R.andThen (decodeValue <| D.list D.value) >> Just
-  in commandThen "dbQuery" (E.string q) h' 
+      h2 = handleResult >> R.andThen (decodeValue <| D.list D.value) >> h >> Just
+  in commandThen "dbQuery" (E.string q) h2 
 
 {-| Delete a file, passing the inner path to the file.
 
 -}
-fileDelete : String -> (Value -> msg) -> Z msg ()
+fileDelete : String -> (String -> msg) -> Z msg ()
 fileDelete path h =
   commandThen "fileDelete" (E.string path) (withErr h) 
 
@@ -260,7 +262,7 @@ Usage: fileGet innerPath [required] ["base64"|"text"] [timeout]
 
 -}
 
-fileGet : String -> Maybe Bool -> Maybe String -> Maybe Int -> (Result String (List String)) -> Z msg () 
+fileGet : String -> Maybe Bool -> Maybe String -> Maybe Int -> (Result String String -> msg) -> Z msg () 
 fileGet ip r fmt to h =
     let
         v = concat [
@@ -269,8 +271,8 @@ fileGet ip r fmt to h =
             , optional E.string fmt
             , optional E.int to
             ] |> E.list
-        h' = handleResult >> R.andThen (decodeValue D.string) >> Just
-    in commandThen "fileGet" v h'
+        h2 = handleResult >> R.andThen (decodeValue D.string) >> h >> Just
+    in commandThen "fileGet" v h2
 
 {-| List files in a directory (recursively), passing the inner path.
 
@@ -278,9 +280,7 @@ fileGet ip r fmt to h =
 
 fileList : String -> (Result String Value -> msg) -> Z msg ()
 fileList s h = 
-  let
-      h' = handleResult >> Just
-  in commandThen "fileList" (E.string s) h'
+  commandThen "fileList" (E.string s) (withResult h) 
 
 {-| Simple JSON file query command.
 
@@ -292,12 +292,12 @@ Examples:
 
 -}
 
-fileQuery : String -> String -> (Result String (List Value)) Z msg ()
+fileQuery : String -> String -> (Result String (List Value) -> msg) -> Z msg ()
 fileQuery dip q h =
   let
       v = (E.list [E.string dip, E.string q])
-      h' = handleResult >> R.andThen (decodeValue <| D.list D.value) >> Just 
-  in commandThen "fileQuery" v h'
+      h2 = handleResult >> R.andThen (decodeValue <| D.list D.value) >> h >> Just 
+  in commandThen "fileQuery" v h2
 
 {-| Get the rules for a file, passing the inner path.
 
@@ -355,8 +355,8 @@ Usage: `siteSign [privateKey] [innerPath]`
 
 -}
 
-siteSign : Maybe String -> Maybe String -> Z msg ()
-siteSign pk ip =
+siteSign : Maybe String -> Maybe String -> (String -> msg) -> Z msg ()
+siteSign pk ip h =
     let
         v = concat [
             optional E.string pk
@@ -373,7 +373,7 @@ Usage: `mergerSiteAdd ["A", "B"]
 -}
 mergerSiteAdd : List String -> Z msg ()
 mergerSiteAdd ss = 
-  command "mergerSiteAdd" (E.list <| L.map E.string ss)
+  command "mergerSiteAdd" (E.list <| map E.string ss)
 
 {-| Stop seeding and delete a merged site.
 
@@ -391,7 +391,7 @@ Usage: `mergerSiteList getDetails`
 -}
 mergerSiteList : Bool -> (Value -> msg) -> Z msg ()
 mergerSiteList details h =
-  commandThen "mergerSiteList" (E.bool details) (Just h)
+  commandThen "mergerSiteList" (E.bool details) (h >> Just)
 
 -- HELPER functions
 
