@@ -120,22 +120,22 @@ liftUpdate : (model -> Either WrapperMessage msg -> Z msg model) ->
   (Z msg model, Cmd (M msg))
 liftUpdate u zm mm = 
   let
-    insertMessage x z  = z |> andThen (flip u x) |> flush
-    handleMsg res = case res of
-      (model, Just msg) -> u model (Right msg)
-      (model, Nothing) -> wrap model 
-    skip = (zm, C.none)
-  in case mm of
-    Forward m -> insertMessage (Right m) zm
-    Response _ t v -> 
-      responseMessage t v zm |> andThen handleMsg |> flush
-    Command i c -> case c of
-      "ping" -> zm |> carryThrough (response i <| E.string "pong") |> flush 
-      "wrapperReady" -> insertMessage (Left WrapperReady) zm
-      "wrapperOpenedWebsocket" -> insertMessage (Left WrapperOpenedWebsocket) zm
-      "wrapperClosedWebsocket" -> insertMessage (Left WrapperClosedWebsocket) zm
-      _ -> skip
-    MErr -> skip
+    insertMessage x z  = z |> andThen (flip u x) 
+    handleMsg (model, res) = case res of
+      Just msg -> u model (Right msg)
+      Nothing -> wrap model 
+    z2 = case mm of
+      Forward m -> insertMessage (Right m) zm
+      Response _ t v -> 
+        responseMessage t v zm |> andThen handleMsg
+      Command i c -> case c of
+        "ping" -> zm |> carryThrough (response i <| E.string "pong")
+        "wrapperReady" -> insertMessage (Left WrapperReady) zm
+        "wrapperOpenedWebsocket" -> insertMessage (Left WrapperOpenedWebsocket) zm
+        "wrapperClosedWebsocket" -> insertMessage (Left WrapperClosedWebsocket) zm
+        _ -> zm
+      MErr -> zm
+  in flush z2
 
 -- Lookup the domain message associated to the response.
 responseMessage : Int -> Value -> Z msg model -> Z msg (model, Maybe msg)
@@ -204,7 +204,6 @@ unpackRawMsg v =
 
 sysMessages : Sub (M a)
 sysMessages = recvZeroFrameMsg unpackRawMsg 
-
 
 -- 
 -- Utilities
