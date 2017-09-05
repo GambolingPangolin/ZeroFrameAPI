@@ -1,32 +1,53 @@
-module ZeroFrame.Internal exposing (
-  -- Types
-  Z, M, WrapperMessage, RawMsg
-  , pure
+module ZeroFrame.Core exposing (
+  -- Model wrapper 
+  Z 
+  , wrap
   , andThen
   , fmap
-  , liftUpdate, liftView, liftInit, liftSubscription
+  
+  -- Message wrapper and system messages
+  , M
+  , WrapperMessage (..)
+
+  -- Lifters
+  , liftInit
+  , liftSubscription
+  , liftUpdate, 
+  , liftView, 
+
+  -- Utilities
   , command
+  , commandThen
   , response
+  , sequence
   , include
-  , flush
+  , forward
 	)
+
+{-| We have collected the logic for passing message up to the ZeroFrame wrapper in this model.  
+
+# Model wrapper
+@docs Z, wrap, andThen, fmap
+
+# Messages
+@docs M, WrapperMessage
+
+# Utilities
+@docs command, response, include
+-}
 
 import Cmd as C
 import List as L
 import Tuple as T
 import JSON.Encode exposing (Value)
 
--- Dispatch
-
-type alias Interpreter a = Value -> Maybe a
-type alias Dispatch a = List (Int, Interpreter a)
-
-{-| Hide the state required to interact with the ZeroFrame wrapper. 
--}
+-- Compact representations of system messages.
 type RawMsg =
   C String Value
   | R Int Value 
 
+{-| Wrapper for a model.
+-}
 type Z a b =
   Z
     Int -- An available id
@@ -34,23 +55,22 @@ type Z a b =
     List (Int, Value -> Maybe a) -- Response handlers 
     b -- Model
 
-model : Z a b -> b
-
-
 {-| Wrap a model in a fresh context.
 -}
-pure : b -> Z a b
-pure m = Z 0 [] [] m 
+wrap : b -> Z a b
+wrap m = Z 0 [] [] m 
 
 {-| Sequence wrapped model computations.
 -}
 andThen : (a -> Z m b) -> Z m a -> Z m b
 andThen f (Z i c d m) = case f m of
-  Z j c' d' m' -> Z (i+j) c'' d'' m' where
-    d'' = d ++ L.map (T.mapFirst (+i)) d'
-    c'' = L.map f c' ++ c
-    f (Left x) = Left x
-    f (Right (k, v)) = Right (k+i,v)
+  Z j c' d' m' -> 
+    let
+      d'' = d ++ L.map (T.mapFirst (+i)) d'
+      c'' = L.map f c' ++ c
+      f (Left x) = Left x
+      f (Right (k, v)) = Right (k+i,v)
+    in Z (i+j) c'' d'' m'
 
 {-| Sequence computations ignoring the result of the first computation. 
 -}
@@ -58,20 +78,18 @@ butThen : Z m a -> Z m b -> Z m b
 butThen za zb = za |> andThen (always zb)
 
 carryThrough : Z m a -> Z m b -> Z m a 
-carryThrough za zb = za |> andThen (\x -> zb |> butThen (pure x))
+carryThrough za zb = za |> andThen (\x -> zb |> butThen (wrap x))
 
 {-| Modify the value in a ZeroNet context.
 -}
 fmap : (a -> b) -> Z m a -> Z m b
 fmap f (Z i c d m) = Z i c d (f m) 
 
-
-sequenceM : List (Z a b) -> Z a (List b)
-sequenceM [] = pure []
-sequenceM (z::zs) = fmap (:) z |> andThen \cz -> fmap cz (sequenceM zs) 
-
-mapM_ : List (Z a b) -> Z a ()
-mapM_ = sequenceM >> fmap (always ())
+{-| Sequence a list of ZeroFrame actions into a list-valued ZeroFrame action.
+-}
+sequence : List (Z a b) -> Z a (List b)
+sequence [] = wrap []
+sequence (z::zs) = fmap (:) z |> andThen \cz -> fmap cz (sequenceM zs) 
 
 --
 -- Architecture lifting functions
@@ -85,25 +103,38 @@ liftUpdate : (model -> Either WrapperMessage msg -> Z msg model) ->
   Z msg model -> 
   M msg -> 
   (Z msg model, Cmd (M msg))
-liftUpdate u zm mm = case mm of
-  Forward m -> insertMessage (Right m) 
-  Response _ t v -> zm |> responseMessage t v |> andThen (M.map (insertMessage . Right) >> M.withDefault skip)
-  Command i c -> case c of
-    "ping" -> carryThrough zm (pong i) |> flush 
-    "wrapperReady" -> insertMessage (Left WrapperReady) 
-    "wrapperOpenedWebsocket" -> insertMessage (Left WrapperOpenedWebsocket)
-    "wrapperClosedWebsocket" -> insertMessage (Left WrapperClosedWebsocket)
-    _ -> skip
-  where
+liftUpdate u zm mm = 
+  let
     insertMessage x = zm |> andThen (flip u x) |> flush
     skip = (zm, C.none)
+  in case mm of
+    Forward m -> insertMessage (Right m) 
+    Response _ t v -> zm |> responseMessage t v |> andThen (M.map (insertMessage . Right) >> M.withDefault skip)
+    Command i c -> case c of
+      "ping" -> carryThrough zm (respond i <| E.string "pong") |> flush 
+      "wrapperReady" -> insertMessage (Left WrapperReady) 
+      "wrapperOpenedWebsocket" -> insertMessage (Left WrapperOpenedWebsocket)
+      "wrapperClosedWebsocket" -> insertMessage (Left WrapperClosedWebsocket)
+      _ -> skip
 
+-- Lookup the domain message associated to the response.
+responseMessage : Int -> Value -> Z msg model -> Z msg (Maybe msg)
+responseMessage t res (Z i c d _) = 
+  let
+    rc [] ys = ys
+    rc (x:xs) ys = rc xs (x:ys)
+    f xs [] = Z i c d Nothing
+    f xs (y:ys) = if first y == t 
+      then Z i c (rc xs ys) (second y res) 
+      else f (y:xs) ys 
+  in f [] d 
+ 
 {-| Lift a domain model to a ZeroNet-Elm model.
 
     init = liftInit init'
 -}
 liftInit : model -> Z msg model
-liftInit = pure
+liftInit = wrap
 
 {-| Lift a domain subscription function to a ZeroNet-Elm subscription.
 
@@ -137,40 +168,53 @@ type M a =
 	-- Response id to result
 	| Response Int Int Value
 
+{-| Promote a domain message to a system message. 
+-}
+forward : a -> M a
+forward = Forward
 
+{-| Send a response message.
+
+    respond 7 (E.string "success")
+-}
 respond : Int -> Value -> Z a b
 respond t v = Z 1 [Right (0, R t v)] [] ()
 
-command : String -> Value -> Maybe (Value -> Maybe a) -> Z a b
-command c v h = 
+{-| Send a command message with no response handler.
+    
+    command "wrapperInnerLoaded" E.null
+-}
+command : String -> Value -> Z a ()
+command s v = command' s v Nothing
+
+{-| Send a command message with a handler.
+
+    commandThen "wrapperGetState" E.null handleState
+-}
+commandThen : String -> Value -> (Value -> Maybe a) -> Z a ()
+commandThen s v h = command' s v (Just h)
+
+command' : String -> Value -> Maybe (Value -> Maybe a) -> Z a () 
+command' c v h = 
   let
     d = case h of
       Just handler -> [(0, handler)]
       Nothing -> []
   in Z 1 [Right (0, C c v)] d ()
 
-pong : Int -> Z a b
-pong t = respond t (E.string "pong")
-
--- Lookup the domain message associated to the response.
-responseMessage : Int -> Value -> Z msg model -> Z msg (Maybe msg)
-responseMessage t res (Z i c d _) = f [] d where
-  rc [] ys = ys
-  rc (x:xs) ys = rc xs (x:ys)
-  f xs [] = Z i c d Nothing
-  f xs (y:ys) = if first y == t 
-    then Z i c (rc xs ys) (second y res) 
-    else f (y:xs) ys 
 
 {-| Schedule a command.
 -}
 include : Cmd a -> Z a ()
 include c = Z 0 [Left c] [] () 
 
--- Bring the commands out of context.  
+{-| Bring the accumulated commands out of context.
+-}
 flush : Z a b -> (Z a b, Cmd (M a))
-flush (Z i cs d m) = (Z i [] d m, C.batch (map f $ L.reverse cs)) where
-  f (Left c) = C.map Forward c
-  f (Right (i, x)) = case x of
-    C s p -> sendZeroFrameMsg { id = i, cmd = s, params = p, to = Nothing, result = E.null }
-    R t v -> sendZeroFrameMsg { id = i, cmd = "response", params = E.null, to = t, result = v }
+flush (Z i cs d m) =  
+  let
+    f (Left c) = C.map Forward c
+    f (Right (i, x)) = case x of
+      C s p -> sendZeroFrameMsg { id = i, cmd = s, params = p, to = Nothing, result = E.null }
+      R t v -> sendZeroFrameMsg { id = i, cmd = "response", params = E.null, to = t, result = v }
+  in (Z i [] d m, C.batch (map f <| L.reverse cs))
