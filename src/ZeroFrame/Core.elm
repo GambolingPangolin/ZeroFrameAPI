@@ -114,15 +114,15 @@ sequence xs = case xs of
     
     update = liftUpdate innerUpdate
 -}
-liftUpdate : (model -> Either WrapperMessage msg -> Z msg model) -> 
-  Z msg model -> 
+liftUpdate : (Either WrapperMessage msg -> model -> Z msg model) -> 
   M msg -> 
+  Z msg model -> 
   (Z msg model, Cmd (M msg))
-liftUpdate u zm mm = 
+liftUpdate u mm zm = 
   let
-    insertMessage x z  = z |> andThen (flip u x) 
+    insertMessage x z  = z |> andThen (u x) 
     handleMsg (model, res) = case res of
-      Just msg -> u model (Right msg)
+      Just msg -> u (Right msg) model
       Nothing -> wrap model 
     z2 = case mm of
       Forward m -> insertMessage (Right m) zm
