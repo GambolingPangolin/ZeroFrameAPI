@@ -4,6 +4,7 @@ module ZeroFrame.Core exposing (
   , wrap
   , andThen
   , fmap
+  , mapMsg
   , sequence
   
   -- Message wrapper and system messages
@@ -27,7 +28,7 @@ module ZeroFrame.Core exposing (
 {-| We have collected the logic for passing message up to the ZeroFrame wrapper in this model.  
 
 # Model wrapper
-@docs Z, wrap, andThen, fmap, sequence
+@docs Z, wrap, andThen, fmap, mapMsg, sequence
 
 # Messages
 @docs M, WrapperMessage
@@ -105,6 +106,15 @@ sequence : List (Z a b) -> Z a (List b)
 sequence xs = case xs of
   [] -> wrap []
   (z::zs) -> fmap (::) z |> andThen (\cz -> fmap cz (sequence zs))
+
+{-| Apply a transformation to the messaging type.
+-}
+mapMsg : (a1 -> a2) -> Z a1 b -> Z a2 b
+mapMsg f (Z i c1 d1 m) =
+  let
+      c2 = L.map (Ei.mapLeft (C.map f)) c1
+      d2 = L.map (\(i, g) -> (i , g >> M.map f)) d1
+  in Z i c2 d2 m
 
 --
 -- Architecture lifting functions
