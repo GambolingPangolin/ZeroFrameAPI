@@ -13,7 +13,7 @@ This package provides two central types `M msg` and `Z msg model` which wrap the
 
 The main module can always have the default implementation:
 
-```
+```elm
 import ZeroFrame.Core exposing (liftInit, liftSubscriptions, liftUpdate, liftView)
 import App exposing (initZ, subscriptionsZ, updateZ, viewZ)
 
@@ -26,7 +26,7 @@ main = Html.program
 
 The only function above with an unfamiliar type is `updateZ`.  Values of type `Z msg model` can be produced in two ways.  First, `wrap : model -> Z msg model` promotes a value of type `model` to type `Z msg model`.  Second, ZeroFrame API calls produce values of type `Z msg model`.  
 
-```
+```elm
 -- Example --
 -------------
 
