@@ -6,7 +6,7 @@ I totally rewrote the project to do everything in Elm except send and recieve ra
 
 This package provides two central types `M msg` and `Z msg model` which wrap the domain-specific message and model types, respectively, written by end users.  To write a ZeroNet app using this package, the users write the following functions:
 
-* `initZ : model`
+* `initZ : (model, Cmd msg)`
 * `subscriptionsZ : model -> Sub msg`
 * `updateZ : Either WrapperMessage msg -> model -> Z msg model`
 * `viewZ : model -> Html msg`
@@ -24,7 +24,7 @@ main = Html.program
 	, view = liftView viewZ }
 ```
 
-The only function above with an unfamiliar type is `updateZ`.  Values of type `Z msg model` can be produced in two ways.  First, `wrap : model -> Z msg model` promotes a value of type `model` to type `Z msg model`.  Second, ZeroFrame API calls produce values of type `Z msg model`.  
+The only function above with an unfamiliar type is `updateZ`.  Values of type `Z msg model` can be produced in three ways.  First, `wrap : model -> Z msg model` promotes a value of type `model` to type `Z msg model`.  Second, ZeroFrame API calls produce values of type `Z msg model`.  Finally, commands can be promoted to `Z msg ()` values using `ZeroFrame.Core.include`
 
 ```elm
 -- Example --
